@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-Time Color Grid</title>
+    <style>
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(16, 40px);
+            grid-template-rows: repeat(16, 40px);
+            gap: 1px;
+            width:95vw;
+            aspect-ratio: 1;
+            max-width: 1000px;
+            max-height: 1000px;
+            margin: 0 auto;
+        }
+        .square {
+            width: 40px;
+            height: 40px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            transition: background-color 0.4s ease;
+        }
+        .square:hover {
+            transform: scale(1.05);
+        }
+        @media (max-width: 500px) {
+            .grid { width: 95vw;
+                
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Color Grid</h1>
+    <div class="grid" id="grid">
+        {% for i in range(256) %}
+            <div class="square" id="square-{{ i }}" style="background-color: {{ grid_colors.get('square-' ~ i, '#ffffff') }}"></div>
+        {% endfor %}
+    </div>
+    <input type="color" id="colorPicker">
+
+    <!-- Socket.IO client (3.x for Flask-SocketIO 5.5.1) -->
+    <script src="https://cdn.socket.io/3.1.3/socket.io.min.js"></script>
+   
+    <script>
+        const squares = document.querySelectorAll('.square');
+        const colorPicker = document.getElementById('colorPicker');
+        const socket = io(window.location.origin); // Socket.IO client
+        
+        let isMouseDown = false;
+        
+        // Track mouse button state
+        document.addEventListener('mousedown', () => isMouseDown = true);
+        document.addEventListener('mouseup', () => isMouseDown = false);
+        
+        // Prevent text selection while dragging
+        document.getElementById('grid').style.userSelect = 'none';
+        
+        // Paint a square function
+        function paintSquare(square) {
+            const color = colorPicker.value;
+            square.style.backgroundColor = color;
+            socket.emit('update_color', { square_id: square.id, color: color });
+        }
+        
+        // Add event listeners to squares
+        squares.forEach(square => {
+            // Left-click or drag to paint
+            square.addEventListener('click', () => paintSquare(square));
+        
+            square.addEventListener('mouseover', () => {
+                if (isMouseDown) paintSquare(square);
+            });
+        
+            // Right-click resets square
+            square.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                square.style.backgroundColor = '#ffffff';
+                socket.emit('update_color', { square_id: square.id, color: '#ffffff' });
+                return false;
+            });
+        
+            // Optional tooltip
+            square.title = "Left-click drag: paint | Right-click: reset";
+        });
+        
+        // Socket.IO: receive updates from server
+        socket.on('color_update', data => {
+            const square = document.getElementById(data.square_id);
+            if (square) {
+                square.style.backgroundColor = data.color;
+            }
+        });
+        
+        // Socket.IO connection debug
+        socket.on('connect', () => console.log('Connected:', socket.id));
+        </script>
+</body>
+</html>
